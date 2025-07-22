@@ -204,7 +204,7 @@ abstract class db {
 	 * Open a Connection with the Database
 	 * @return mixed
 	 */ 
-	public static function open(mixed $type, mixed $database, string $user = '', string $password = '', string $host = 'localhost', int $Log_Slow_DB_Query_Seconds = 0) {
+	public static function open(mixed $type, mixed $database, string $user = '', string $password = '', string $host = 'localhost', int $port = 35948, int $Log_Slow_DB_Query_Seconds = 0) { // Changed from 3306 to 35948
 		$db_new = false;
 		switch($type) {
 			//case 'mysql':
@@ -215,7 +215,7 @@ abstract class db {
 				}
 				if(is_string($database)) {
 					$db_new = new $name();
-					$db_new->_open($database, $user, $password, $host, $Log_Slow_DB_Query_Seconds);
+					$db_new->_open($database, $user, $password, $host, $Log_Slow_DB_Query_Seconds, $port);
 				}
 				break;
 		}
@@ -276,7 +276,7 @@ abstract class db {
 		$sql = 'INSERT INTO ' . $table . ' (' . implode(',', (array)$this->_quoteFields(array_keys((array)$data))) . ') VALUES(' . implode(',', $this->placeHolders($data)) . ')';
 
 		/**
-		 * don't wrap single inserts in transactions 
+		 * dont wrap single inserts in transactions 
 		 * By forcing each insert to be in a transaction, 
 		 * the user is denied control over transaction granularity. 
 		 * As a side-note, users can now diagnose failed inserts, since the rollback cleared errors.
@@ -455,7 +455,7 @@ abstract class db {
 	/**
 	 * makeQuery
 	 * This combines a query and parameter array into a final query string for execution
-	 * PDO drivers don't need to use this
+	 * PDO drivers dont need to use this
 	 */
 	protected function makeQuery(string $sql, mixed $parameters):string {
 		// bypass extra logic if we have no parameters
@@ -555,7 +555,7 @@ abstract class db {
 		$values = array();
 		foreach((array)$data as $key => $value) {
 			$escape = true;
-			// don't quote or esc if value is an array, we treat it as a "decorator" 
+			// dont quote or esc if value is an array, we treat it as a "decorator" 
 			// that tells us not to escape the value contained in the array
 			if(is_array($value) && !is_object($value)) {
 				$escape = false;
@@ -676,9 +676,9 @@ class db_mysqli extends db {
 	 * also set the encoding to UTF8
 	 * @return bool|mysqli
 	 */
-	protected function _open(string $database, string $user, string $password, string $host, int $Log_Slow_DB_Query_Seconds) {
+	protected function _open(string $database, string $user, string $password, string $host, int $Log_Slow_DB_Query_Seconds, int $port = 35948) { // Changed from 3306 to 35948
 		$this->database = $database;
-		$this->connection = mysqli_connect($host, $user, $password, $database);
+		$this->connection = mysqli_connect($host, $user, $password, $database, $port);
 		$this->Log_Slow_DB_Query_Seconds = $Log_Slow_DB_Query_Seconds;
 		// Check connection
 		if (mysqli_connect_errno()) {
