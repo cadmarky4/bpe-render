@@ -164,6 +164,47 @@ function getCategoryForms_Html(int $cat_id, string $space = '', bool $options = 
 	$html = '';
 	foreach ($forms[$cat_id] as $row) {
 		$id = $row['form_id'];
+		$form_key = $cat_id.'_'.$id; // Key used to check if form is selected
+		
+		// ========================================
+		// FORM FILTERING LOGIC - Only show selected forms
+		// ========================================
+		$show_form = false;
+		
+		if ($edit) {
+			// Admin edit mode - show all forms
+			$show_form = true;
+		}
+		elseif ($select) {
+			// Form selection mode - show only group selected forms
+			$show_form = in_array($form_key, $group_forms_selected_arr);
+		}
+		elseif ($trainer) {
+			// Trainer mode - show forms they have read or write access to
+			$show_form = (in_array($form_key, $trainer_forms_selected_read_arr) || 
+						 in_array($form_key, $trainer_forms_selected_write_arr));
+		}
+		elseif ($trainer_view) {
+			// Trainer viewing athlete - show forms trainer has access to AND athlete has selected
+			$trainer_has_access = (in_array($form_key, $trainer_forms_selected_read_arr) || 
+								  in_array($form_key, $trainer_forms_selected_write_arr));
+			$athlete_has_selected = in_array($form_key, $group_forms_selected_arr);
+			$show_form = ($trainer_has_access && $athlete_has_selected);
+		}
+		else {
+			// Regular athlete view - show only their selected forms
+			$show_form = in_array($form_key, $group_forms_selected_arr);
+		}
+		
+		// Skip this form if it shouldn't be shown
+		if (!$show_form) {
+			continue;
+		}
+		
+		// ========================================
+		// FORM RENDERING - Only reached if form should be displayed
+		// ========================================
+		
 		$form_name = $row['name'];
 		if ($edit) $form_name = $row['name'].' (interner Name: '.$row['name2'].')';
 		$select_elem = 'sel_g_'.$group_id.'_c_'.$cat_id.'_'.$id;
@@ -193,7 +234,7 @@ function getCategoryForms_Html(int $cat_id, string $space = '', bool $options = 
 					'</a></td>';
 		
 		if ($options) {
-			
+			// Options mode - no additional columns needed
 		}
 		else {
 			if ($select OR $edit) {
@@ -231,7 +272,6 @@ function getCategoryForms_Html(int $cat_id, string $space = '', bool $options = 
 	}
 	return $html;
 }
-
 
 function buildCategory_Html(int $parent, string $collapse_id_prefix, int $level = 1, bool $select = false):string {
 	global $categories, $group_id, $box;
