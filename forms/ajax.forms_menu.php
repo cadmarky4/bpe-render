@@ -263,6 +263,7 @@ function getCategoryForms_Html(int $cat_id, string $space = '', bool $options = 
 						'</span></a></td>';
 			}
 			elseif ($trainer_view) {
+				// Hide all checkboxes in normal viewing mode - just show form names
 				$html .= '';
 			}
 		}
