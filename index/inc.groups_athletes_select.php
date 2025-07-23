@@ -161,114 +161,73 @@ $Athlete_Name = $a_vorname.' &nbsp; '.$a_name;
 //Athletes Select
 $Athletes_Select = '';
 if ($ADMIN OR $THIS_LOCATION_ADMIN OR $THIS_GROUP_ADMIN OR $THIS_GROUP_ADMIN_2) {
-    $Athletes_Select = '<span id="Select_Athletes_title">' . $LANG->INDEX_ATHLETE . ' : &nbsp; </span>' .    
-                        '<select name="Select_Athletes" id="Select_Athletes">' .
-                            '<option value="' . $UID . '" selected>' .
-                                $a_vorname . ' ' . $a_name .
-                            '</option>';
+        $where = '';
+        $join_condition = '';
+        $group_filter = '';
+        
+        // For full admins, show ALL users across all groups
+        if ($ADMIN) {
+                // Super admin sees everyone - no restrictions
+                $where = "AND u.status = 1";
+                $join_condition = "LEFT JOIN users2groups u2g ON u.id = u2g.user_id";
+                $group_filter = ""; // No group restriction
+        }
+        // For location admins, show all users in their location
+        elseif ($THIS_LOCATION_ADMIN) {
+                $where = "AND u.level < 50 AND u.status = 1";
+                $join_condition = "LEFT JOIN users2groups u2g ON u.id = u2g.user_id 
+                                   LEFT JOIN groups g ON u2g.group_id = g.id";
+                $group_filter = "AND g.location_id = '$LOCATION'";
+        }
+        // For group admins, restrict to their group and user levels
+        else {
+                if ($THIS_GROUP_ADMIN or $THIS_GROUP_ADMIN_2) {
+                        $where = "AND u.level < 40 AND u.status = 1";
+                }
+                $join_condition = "LEFT JOIN users2groups u2g ON u.id = u2g.user_id";
+                $group_filter = "AND u2g.group_id = '$GROUP' AND u2g.status = 1";
+        }
 
-    // Query logic based on admin level
-    if ($ADMIN) {
-        // Super admin sees ALL users across all groups and locations
-        $u_rows = $db->fetch("SELECT DISTINCT u.id, u.uname, u.lastname, u.firstname, u.level, 
-                                COALESCE(g.name, 'No Group') as group_name,
-                                COALESCE(l.name, 'No Location') as location_name
+        $Athletes_Select = '<span id="Select_Athletes_title">' . $LANG->INDEX_ATHLETE . ' : &nbsp; </span>' .    
+                                                '<select name="Select_Athletes" id="Select_Athletes">' .
+                                                        '<option value="' . $UID . '" selected>' .
+                                                                $a_vorname . ' ' . $a_name .
+                                                        '</option>';
+
+        // Build the query based on admin level
+        if ($ADMIN) {
+                // Super admin query - all users
+                $u_rows = $db->fetch("SELECT DISTINCT u.id, u.uname, u.lastname, u.firstname, u.level
                         FROM users u
-                        LEFT JOIN users2groups u2g ON u.id = u2g.user_id AND u2g.status = 1
-                        LEFT JOIN `groups` g ON u2g.group_id = g.id
-                        LEFT JOIN locations l ON g.location_id = l.id
                         WHERE u.status = 1 AND u.id != ?
-                        ORDER BY 
-                            CASE 
-                                WHEN u.level = 99 THEN 'Admin Account'
-                                WHEN u.level = 50 THEN 'Location Admin' 
-                                WHEN u.level = 45 THEN 'Group Admin'
-                                WHEN u.level = 40 THEN 'Group Admin (reduced)'
-                                WHEN u.level = 30 THEN 'Test profile Coach'
-                                WHEN u.level = 10 THEN 'Test profile Athlete'
-                                ELSE 'Other'
-                            END,
-                            COALESCE(g.name, 'ZZZZ'),
-                            u.firstname, u.lastname, u.id", array($UID));
-    }
-    elseif ($THIS_LOCATION_ADMIN) {
-        // Location admin sees all users in their location
-        $u_rows = $db->fetch("SELECT DISTINCT u.id, u.uname, u.lastname, u.firstname, u.level,
-                                g.name as group_name
+                        ORDER BY u.level DESC, u.firstname, u.lastname, u.id", array($UID));
+        } else {
+                // Other admin levels with restrictions
+                $u_rows = $db->fetch("SELECT DISTINCT u.id, u.uname, u.lastname, u.firstname, u.level
                         FROM users u
-                        LEFT JOIN users2groups u2g ON u.id = u2g.user_id AND u2g.status = 1
-                        LEFT JOIN `groups` g ON u2g.group_id = g.id
-                        WHERE u.status = 1 AND u.level < 50 AND u.id != ? 
-                        AND (g.location_id = ? OR u.level >= 45)
-                        ORDER BY u.level DESC, g.name, u.firstname, u.lastname, u.id", array($UID, $LOCATION));
-    }
-    else {
-        // Group admins see users in their group + other group admins
-        $u_rows = $db->fetch("SELECT DISTINCT u.id, u.uname, u.lastname, u.firstname, u.level,
-                                g.name as group_name
-                        FROM users u
-                        LEFT JOIN users2groups u2g ON u.id = u2g.user_id AND u2g.status = 1
-                        LEFT JOIN `groups` g ON u2g.group_id = g.id
-                        WHERE u.status = 1 AND u.level < 40 AND u.id != ?
-                        AND (u2g.group_id = ? OR u.level >= 30)
-                        ORDER BY u.level DESC, u.firstname, u.lastname, u.id", array($UID, $GROUP));
-    }
-    
-    if ($db->numberRows() > 0) {
-        $current_section = '';
-        foreach ($u_rows as $u_row) {
-            $u_name = $u_row['lastname'] != '' ? $u_row['lastname'] : $u_row['uname'];
-            $u_vorname = $u_row['firstname'] != '' ? $u_row['firstname'] : $u_row['uname'];
-
-            // Create section headers for better organization
-            $section_name = '';
-            if ($ADMIN) {
-                $level_name = '';
-                switch($u_row['level']) {
-                    case 99: $section_name = 'Admin Account'; break;
-                    case 50: $section_name = 'Location Admin'; break;
-                    case 45: $section_name = 'Group Admin'; break;
-                    case 40: $section_name = 'Group Admin (reduced)'; break;
-                    case 30: $section_name = 'Test profile Coach'; break;
-                    case 10: $section_name = 'Test profile Athlete'; break;
-                    default: $section_name = 'Other'; break;
-                }
-                
-                if ($current_section != $section_name) {
-                    if ($current_section != '') {
-                        $Athletes_Select .= '</optgroup>';
-                    }
-                    $Athletes_Select .= '<optgroup label="' . htmlspecialchars($section_name) . '">';
-                    $current_section = $section_name;
-                }
-            }
-
-            $selected = '';
-            if (isset($_COOKIE['ATHLETE']) and $_COOKIE['ATHLETE'] == $u_row['id']) {
-                $selected = ' selected';
-            }
-
-            $display_name = $u_vorname . ' ' . $u_name;
-            if (isset($u_row['group_name']) && $u_row['group_name'] != 'No Group') {
-                // Don't show group name for admins since they're in the section header
-                if (!$ADMIN || $u_row['level'] == 10 || $u_row['level'] == 30) {
-                    $display_name .= ' (' . $u_row['group_name'] . ')';
-                }
-            }
-
-            $Athletes_Select .= '<option value="' . $u_row['id'] . '"' . $selected . '>' .
-                                    htmlspecialchars($display_name) .
-                                '</option>';
+                        $join_condition
+                        WHERE 1=1 $where $group_filter AND u.id != ?
+                        ORDER BY u.level DESC, u.firstname, u.lastname, u.id", array($UID));
         }
         
-        if ($ADMIN && $current_section != '') {
-            $Athletes_Select .= '</optgroup>';
-        }
-    }
-    $Athletes_Select .= '</select>';
-    $Athletes_Select .= '<script>jQuery(function(){Select__Athletes__Init();});</script>';
-}
+        if ($db->numberRows() > 0)  {
+                foreach ($u_rows as $u_row) {
+                        $u_name = $u_row['lastname'] != '' ? $u_row['lastname'] : $u_row['uname'];
+                        $u_vorname = $u_row['firstname'] != '' ? $u_row['firstname'] : $u_row['uname'];
 
+                        $selected = '';
+                        if (isset($_COOKIE['ATHLETE']) and $_COOKIE['ATHLETE'] == $u_row['id']) {
+                                $selected = ' selected';
+                        }
+
+                        $Athletes_Select .= '<option value="' . $u_row['id'] . '"' . $selected . '>' .
+                                                                        $u_vorname . ' ' . $u_name .
+                                                                '</option>';
+                }
+        }
+        $Athletes_Select .= '</select>';
+        $Athletes_Select .= '<script>jQuery(function(){Select__Athletes__Init();});</script>';
+}
 elseif ($TRAINER) {
 	//give the name in case don't have athlete yet
 	$Athletes_Select = '<div class="just_name">'.$a_vorname.' &nbsp; '.$a_name.'</div>';

@@ -135,129 +135,36 @@ jQuery(function()
 	});
 	
 	
-//Group Select on Change
-$("#Select_Group").on('change', function () 
-{
-    if ($(this).val() == '') {
-        return false;
-    }
+	//Group Select on Change
+	$("#Select_Group").on('change', function () 
+	{
+		if ($(this).val() == '') {
+			return false;
+		}
 
-    if ($(this).val() == 'Private') {
-        $('#Select_Group_chosen').hide();
-        $('#private_group').css('display', 'inline-block');
-        
-        $('#Select_Group').val(V_GROUP);
-        $("#Select_Group").trigger("chosen:updated");
-    }
-    else {
-        V_GROUP = $(this).val();
+		if ($(this).val() == 'Private') {
+			$('#Select_Group_chosen').hide();
+			$('#private_group').css('display', 'inline-block');
+			
+			$('#Select_Group').val(V_GROUP);
+			$("#Select_Group").trigger("chosen:updated");
+		}
+		else {
+			V_GROUP = $(this).val();
 
-        // Update athlete dropdown dynamically instead of reloading page
-        updateAthleteDropdown(V_GROUP);
-
-        $.cookie('ATHLETE', V_UID, { path: '/'+V_REGmon_Folder, SameSite:'Lax' });
-        
-        const post_data = {
-            group_id: V_GROUP,
-            location_id: V_Group_2_Location[V_GROUP][0],
-            u_id: V_UID
-        };
-        $.post('index/ajax.user_group_update.php', post_data, function(data, result){
-            // Remove the page reload and just update the calendar
-            $('#calendar').fullCalendar('refetchEvents');
-            group_icons_buttons(); // Update group status buttons
-        });
-    }
-});
-
-// New function to dynamically update athlete dropdown
-function updateAthleteDropdown(groupId) {
-    // Only update if user has athlete selection privileges
-    if (V_IS_ADMIN || $("#Select_Athletes").length > 0) {
-        $.ajax({
-            url: 'php/ajax.php?i=users&oper=group',
-            data: { 
-                group_id: groupId,
-                sidx: 'level',
-                sord: 'desc'
-            },
-            dataType: 'json',
-            success: function(response) {
-                const select = $("#Select_Athletes");
-                if (select.length > 0) {
-                    // Clear existing options except the current user
-                    select.empty();
-                    
-                    // Add current user as first option
-                    const currentUserName = V_ATHLETE_NAME || 'Current User';
-                    select.append('<option value="' + V_UID + '" selected>' + currentUserName + '</option>');
-                    
-                    // Group users by level for better organization
-                    const usersByLevel = {};
-                    
-                    if (response.rows && response.rows.length > 0) {
-                        response.rows.forEach(function(row) {
-                            const userId = row[1];
-                            const firstName = row[4] || row[2]; // firstname or username
-                            const lastName = row[5] || '';
-                            const level = row[12];
-                            const requestStatus = row[17];
-                            
-                            // Only show active users with approved status
-                            if (requestStatus == 1) {
-                                const displayName = firstName + (lastName ? ' ' + lastName : '');
-                                
-                                // Group by user level
-                                let levelName = '';
-                                switch(parseInt(level)) {
-                                    case 99: levelName = 'Admin Account'; break;
-                                    case 50: levelName = 'Location Admin'; break;
-                                    case 45: levelName = 'Group Admin'; break;
-                                    case 40: levelName = 'Group Admin (reduced)'; break;
-                                    case 30: levelName = 'Test profile Coach'; break;
-                                    case 10: levelName = 'Test profile Athlete'; break;
-                                    default: levelName = 'Other'; break;
-                                }
-                                
-                                if (!usersByLevel[levelName]) {
-                                    usersByLevel[levelName] = [];
-                                }
-                                
-                                usersByLevel[levelName].push({
-                                    id: userId,
-                                    name: displayName
-                                });
-                            }
-                        });
-                        
-                        // Add optgroups in order
-                        const levelOrder = ['Admin Account', 'Location Admin', 'Group Admin', 'Group Admin (reduced)', 'Test profile Coach', 'Test profile Athlete', 'Other'];
-                        
-                        levelOrder.forEach(function(levelName) {
-                            if (usersByLevel[levelName] && usersByLevel[levelName].length > 0) {
-                                const optgroup = $('<optgroup label="' + levelName + '"></optgroup>');
-                                
-                                usersByLevel[levelName].forEach(function(user) {
-                                    if (user.id != V_UID) { // Don't duplicate current user
-                                        optgroup.append('<option value="' + user.id + '">' + user.name + '</option>');
-                                    }
-                                });
-                                
-                                select.append(optgroup);
-                            }
-                        });
-                    }
-                    
-                    // Update chosen dropdown
-                    select.trigger("chosen:updated");
-                }
-            },
-            error: function() {
-                console.log('Error loading athletes for group:', groupId);
-            }
-        });
-    }
-}
+			$.cookie('ATHLETE', V_UID, { path: '/'+V_REGmon_Folder, SameSite:'Lax' });
+			
+			const post_data = {
+				group_id: V_GROUP,
+				location_id: V_Group_2_Location[V_GROUP][0],
+				u_id: V_UID
+			};
+			$.post('index/ajax.user_group_update.php', post_data, function(data, result){
+				V_GRID_SAVE = true; //for continue loading
+				window.location.reload();
+			});
+		}
+	});
 	
 
 	//Calendar / Options Buttons
